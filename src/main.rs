@@ -26,9 +26,23 @@ pub fn exit_qemu(exit_code: QemuExitCode) {
     }
 }
 
-#[panic_handler] 
+
+
+// existing panic handler
+#[cfg(not(test))]
+#[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    println!("Kernel Panic: {}", info);
+    println!("{}", info);
+    loop {}
+}
+
+// anic handler in test mode
+#[cfg(test)]
+#[panic_handler]
+fn panic(info: &PanicInfo) -> ! {
+    serial_println!("[failed]\n");
+    serial_println!("Error: {}\n", info);
+    exit_qemu(QemuExitCode::Failed);
     loop {}
 }
 
@@ -58,4 +72,5 @@ fn trivial_assertion() {
     serial_print!("trivial assertion... ");
     assert_eq!(1, 1);
     serial_println!("[ok]");
+    loop {}
 }
