@@ -1,5 +1,7 @@
 use volatile::Volatile;
-use core::fmt::{Write, Result};
+use core::fmt::{Write, Result, Arguments};
+use spin::Mutex;
+use lazy_static::lazy_static;
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
@@ -52,6 +54,14 @@ pub struct Writer {
     column_position: usize,
     color_code: ColorCode,
     buffer: &'static mut Buffer,
+}
+
+lazy_static! {
+    pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
+        column_position: 0,
+        color_code: ColorCode::new(Color::Yellow, Color::Black),
+        buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
+    });
 }
 
 impl Writer {
@@ -115,15 +125,19 @@ impl Write for Writer {
     }
 }
 
-pub fn print_something() {
-    
-    let mut writer = Writer {
-        column_position: 0,
-        color_code: ColorCode::new(Color::Yellow, Color::Black),
-        buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
-    };
 
-    writer.write_byte(b'H');
-    writer.write_string("ello ");
-    write!(writer, "The numbers are {} and {}", 42, 1.0 / 3.0).unwrap()
+#[macro_export]
+macro_rules! print {
+    ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
+}
+
+#[macro_export]
+macro_rules! println {
+    () => ($crate::print!("\n"));
+    ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
+}
+
+#[doc(hidden)]
+pub fn _print(args: Arguments){
+    WRITER.lock().write_fmt(args).unwrap();
 }
